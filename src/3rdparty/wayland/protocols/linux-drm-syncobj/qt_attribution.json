@@ -1,0 +1,18 @@
+[
+    {
+        "Id": "wayland-linux-drm-syncobj-protocol",
+        "Name": "Wayland linux-drm-syncobj Protocol",
+        "QDocModule": "qtwaylandclient",
+        "QtUsage": "Used in the Qt Wayland client (QPA) API",
+        "Files": "linux-drm-syncobj-v1.xml",
+
+        "Description": "The Wayland linux-drm-syncobj protocol allows a client to synchronize buffer access with the compositor using DRM synchronization object timeline points (explicit sync)",
+        "Homepage": "https://wayland.freedesktop.org",
+        "Version": "1",
+        "DownloadLocation": "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/raw/main/staging/linux-drm-syncobj/linux-drm-syncobj-v1.xml",
+        "LicenseId": "MIT",
+        "License": "MIT License",
+        "LicenseFile": "../MIT_LICENSE.txt",
+        "Copyright": "Copyright © 2016 The Chromium Authors, 2017 Intel Corporation, 2018 Collabora, Ltd, 2021 Simon Ser"
+    }
+]
