@@ -59,6 +59,7 @@ qt_internal_add_module(WaylandClient
         qwaylanddecorationfactory.cpp qwaylanddecorationfactory_p.h
         qwaylanddecorationplugin.cpp qwaylanddecorationplugin_p.h
         qwaylanddisplay.cpp qwaylanddisplay_p.h
+        qwaylanddrmsyncobjv1.cpp qwaylanddrmsyncobjv1_p.h
         qwaylandfractionalscale.cpp qwaylandfractionalscale_p.h
         qwaylandinputcontext.cpp qwaylandinputcontext_p.h
         qwaylandtextinputv1.cpp qwaylandtextinputv1_p.h
@@ -116,6 +117,7 @@ qt_internal_add_module(WaylandClient
         ../../../3rdparty/wayland/protocols/wp-primary-selection
         ../../../3rdparty/wayland/protocols/xdg-output
         ../../../3rdparty/wayland/protocols/fractional-scale
+        ../../../3rdparty/wayland/protocols/linux-drm-syncobj
         ../../../3rdparty/wayland/protocols/viewporter
         ../../../3rdparty/wayland/protocols/xdg-shell
         ../../../3rdparty/wayland/protocols/wlr-data-control
@@ -149,6 +151,7 @@ qt6_generate_wayland_protocol_client_sources(WaylandClient
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/wayland/protocols/wp-primary-selection/wp-primary-selection-unstable-v1.xml
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/wayland/protocols/xdg-output/xdg-output-unstable-v1.xml
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/wayland/protocols/fractional-scale/fractional-scale-v1.xml
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/wayland/protocols/linux-drm-syncobj/linux-drm-syncobj-v1.xml
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/wayland/protocols/viewporter/viewporter.xml
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/wayland/protocols/wlr-data-control/wlr-data-control-unstable-v1.xml
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/wayland/protocols/xdg-shell/xdg-shell.xml
@@ -183,6 +186,16 @@ qt6_generate_wayland_protocol_client_sources(WaylandClient
 qt_internal_extend_target(WaylandClient CONDITION QT_FEATURE_tabletevent
     SOURCES
         qwaylandtabletv2.cpp qwaylandtabletv2_p.h
+)
+
+# linux-drm-syncobj-v1 (explicit sync) support: needs the DRM uapi headers
+# shipped with libdrm. Without libdrm the tracker compiles to a no-op and
+# the wayland client falls back to implicit sync.
+qt_internal_extend_target(WaylandClient CONDITION TARGET Libdrm::Libdrm
+    DEFINES
+        QT_WAYLANDCLIENT_HAVE_LIBDRM
+    LIBRARIES
+        Libdrm::Libdrm
 )
 
 qt_internal_extend_target(WaylandClient CONDITION QT_FEATURE_clipboard

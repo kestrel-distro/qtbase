@@ -63,6 +63,7 @@ class QWaylandPointerGesturePinchEvent;
 class QWaylandSurface;
 class QWaylandFractionalScale;
 class QWaylandViewport;
+class QWaylandDrmSyncobjFrameTracker;
 class ColorManagementSurface;
 class ImageDescription;
 
@@ -126,6 +127,11 @@ public:
     void commit();
 
     bool waitForFrameSync(int timeout);
+
+    // Explicit synchronization (linux-drm-syncobj-v1) state for this window,
+    // or nullptr when explicit sync is unavailable or disabled. The tracker
+    // is created lazily by the first swap on an EGL window.
+    QWaylandDrmSyncobjFrameTracker *drmSyncobjFrameTracker();
 
     QMargins frameMargins() const override;
     QMargins clientSideMargins() const;
@@ -290,6 +296,9 @@ protected:
     std::unique_ptr<QWaylandSurface> mSurface;
     std::unique_ptr<QWaylandFractionalScale> mFractionalScale;
     std::unique_ptr<QWaylandViewport> mViewport;
+    // Explicit sync (linux-drm-syncobj-v1) state for EGL windows; created
+    // lazily on the first swap and destroyed before the wl_surface.
+    std::unique_ptr<QWaylandDrmSyncobjFrameTracker> mDrmSyncobjFrameTracker;
 
     QWaylandShellIntegration *mShellIntegration = nullptr;
     QWaylandShellSurface *mShellSurface = nullptr;

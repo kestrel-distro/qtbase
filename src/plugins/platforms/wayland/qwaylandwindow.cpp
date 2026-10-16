@@ -22,6 +22,7 @@
 #include "qwaylandshellintegration_p.h"
 #include "qwaylandviewport_p.h"
 #include "qwaylandcolormanagement_p.h"
+#include "qwaylanddrmsyncobjv1_p.h"
 
 #include <QtCore/QFileInfo>
 #include <QtCore/QPointer>
@@ -321,8 +322,19 @@ void QWaylandWindow::endFrame()
     mInFrameRender = false;
 }
 
+QWaylandDrmSyncobjFrameTracker *QWaylandWindow::drmSyncobjFrameTracker()
+{
+    if (!mDrmSyncobjFrameTracker)
+        mDrmSyncobjFrameTracker = std::make_unique<QWaylandDrmSyncobjFrameTracker>(this);
+    return mDrmSyncobjFrameTracker.get();
+}
+
 void QWaylandWindow::reset()
 {
+    // Tear down the explicit sync state first: the syncobj surface wrapper
+    // and the timeline objects must be destroyed before the wl_surface.
+    mDrmSyncobjFrameTracker.reset();
+
     resetSurfaceRole();
 
     if (mSurface) {

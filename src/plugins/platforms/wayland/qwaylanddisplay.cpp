@@ -59,6 +59,7 @@
 #include <QtWaylandClient/private/qwayland-xdg-toplevel-drag-v1.h>
 #include <QtWaylandClient/private/qwayland-wlr-data-control-unstable-v1.h>
 #include <QtWaylandClient/private/qwayland-pointer-warp-v1.h>
+#include <QtWaylandClient/private/qwayland-linux-drm-syncobj-v1.h>
 
 #include <QtCore/private/qcore_unix_p.h>
 
@@ -837,6 +838,12 @@ void QWaylandDisplay::registry_global(uint32_t id, const QString &interface, uin
     } else if (interface == QLatin1String(QtWayland::wp_pointer_warp_v1::interface()->name)) {
         mGlobals.pointerWarp.reset(new WithDestructor<QtWayland::wp_pointer_warp_v1, wp_pointer_warp_v1_destroy>(
                 registry, id, 1));
+    } else if (interface == QLatin1String(QtWayland::wp_linux_drm_syncobj_manager_v1::interface()->name)) {
+        if (!qEnvironmentVariableIsSet("QT_WAYLAND_DISABLE_DRMSYNCOBJ")) {
+            mGlobals.drmSyncobjManager.reset(
+                    new WithDestructor<QtWayland::wp_linux_drm_syncobj_manager_v1,
+                                       wp_linux_drm_syncobj_manager_v1_destroy>(registry, id, 1));
+        }
     }
 #ifndef QT_NO_SESSIONMANAGER
        else if (interface == QLatin1String(QtWayland::xdg_session_manager_v1::interface()->name)) {
