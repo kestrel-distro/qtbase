@@ -7,6 +7,7 @@
 #include <QtWaylandClient/private/qwaylanddisplay_p.h>
 #include <QtWaylandClient/private/qwaylandwindow_p.h>
 #include <QtWaylandClient/private/qwaylandsubsurface_p.h>
+#include <QtWaylandClient/private/qwaylanddrmsyncobjv1_p.h>
 #include <QtWaylandClient/private/qwaylandabstractdecoration_p.h>
 #include <QtWaylandClient/private/qwaylandintegration_p.h>
 #include "qwaylandeglwindow_p.h"
@@ -506,7 +507,72 @@ void QWaylandGLContext::swapBuffers(QPlatformSurface *surface)
         window->waitForFrameSync(100);
     }
     window->handleUpdate();
-    if (!eglSwapBuffers(eglDisplay(), eglSurface))
+
+    // Explicit synchronization (linux-drm-syncobj-v1): hand the compositor an
+    // acquire fence covering all rendering submitted so far and a release
+    // point it must signal before the buffer may be reused. Both points are
+    // double-buffered surface state and are consumed by the commit that
+    // eglSwapBuffers() performs, so they must be set immediately before it.
+    //
+    // If anything is unavailable (no compositor global, no DRM syncobj
+    // support, no EGL_ANDROID_native_fence_sync) the frame is committed
+    // without points, exactly like stock Qt (implicit sync).
+    QWaylandDrmSyncobjFrameTracker *syncobjTracker = nullptr;
+    if (!m_checkedEglSyncobjSupport) {
+        m_checkedEglSyncobjSupport = true;
+        const char *vendor = eglQueryString(eglDisplay(), EGL_VENDOR);
+        // NVIDIA's EGL/egl-wayland stack implements linux-drm-syncobj-v1
+        // internally in eglSwapBuffers(); binding our own syncobj surface on
+        // top would trigger the surface_exists protocol error.
+        m_eglHandlesDrmSyncobj = vendor && strstr(vendor, "NVIDIA") != nullptr;
+    }
+    if (!m_eglHandlesDrmSyncobj)
+        syncobjTracker = window->drmSyncobjFrameTracker();
+    bool pointsPending = false;
+    if (syncobjTracker && syncobjTracker->isValid() && syncobjTracker->prepareFrame()) {
+        if (!m_checkedNativeFenceSync) {
+            m_checkedNativeFenceSync = true;
+            m_hasNativeFenceSync = q_hasEglExtension(eglDisplay(), "EGL_ANDROID_native_fence_sync");
+            if (m_hasNativeFenceSync) {
+                m_eglCreateSyncKHR = reinterpret_cast<PFNEGLCREATESYNCKHRPROC>(
+                        eglGetProcAddress("eglCreateSyncKHR"));
+                m_eglDestroySyncKHR = reinterpret_cast<PFNEGLDESTROYSYNCKHRPROC>(
+                        eglGetProcAddress("eglDestroySyncKHR"));
+                m_eglDupNativeFenceFDANDROID = reinterpret_cast<PFNEGLDUPNATIVEFENCEFDANDROIDPROC>(
+                        eglGetProcAddress("eglDupNativeFenceFDANDROID"));
+            }
+        }
+
+        int fenceFd = -1;
+        if (m_hasNativeFenceSync && m_eglCreateSyncKHR && m_eglDestroySyncKHR
+                && m_eglDupNativeFenceFDANDROID) {
+            // Make sure the fence covers all commands, including the
+            // decoration blit above.
+            glFlush();
+            EGLSyncKHR fence = m_eglCreateSyncKHR(eglDisplay(), EGL_SYNC_NATIVE_FENCE_ANDROID, nullptr);
+            if (fence != EGL_NO_SYNC_KHR) {
+                fenceFd = m_eglDupNativeFenceFDANDROID(eglDisplay(), fence);
+                m_eglDestroySyncKHR(eglDisplay(), fence);
+            }
+        }
+
+        if (fenceFd >= 0) {
+            pointsPending = syncobjTracker->commitFrame(fenceFd);
+        } else {
+            // The surface is bound to explicit sync, so a buffer commit
+            // without acquire/release points would be a protocol error.
+            // Unbind again and commit this frame with implicit sync.
+            syncobjTracker->discardPendingFrame();
+        }
+    }
+
+    const bool swapOk = eglSwapBuffers(eglDisplay(), eglSurface);
+    if (!swapOk && pointsPending) {
+        // The commit carrying the points never happened; drop the pending
+        // state so that no stray points leak into a later commit.
+        syncobjTracker->discardPendingFrame();
+    }
+    if (!swapOk)
         qCWarning(lcQpaWayland, "eglSwapBuffers failed with %#x, surface: %p", eglGetError(), eglSurface);
 }
 

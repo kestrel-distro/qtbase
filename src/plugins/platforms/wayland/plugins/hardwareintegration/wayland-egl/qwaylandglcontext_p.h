@@ -55,6 +55,23 @@ private:
     QWaylandEglWindow *m_currentWindow = nullptr;
     QMetaObject::Connection m_reconnectionWatcher;
     bool m_doneCurrentWorkAround = false;
+
+    // linux-drm-syncobj-v1 (explicit sync) support; resolved lazily on the
+    // first swap. All are null/empty when EGL_ANDROID_native_fence_sync is
+    // not available, in which case the frames are committed with implicit
+    // synchronization exactly like stock Qt.
+    bool m_checkedNativeFenceSync = false;
+    bool m_hasNativeFenceSync = false;
+    PFNEGLCREATESYNCKHRPROC m_eglCreateSyncKHR = nullptr;
+    PFNEGLDESTROYSYNCKHRPROC m_eglDestroySyncKHR = nullptr;
+    PFNEGLDUPNATIVEFENCEFDANDROIDPROC m_eglDupNativeFenceFDANDROID = nullptr;
+
+    // Some EGL implementations (NVIDIA's libEGL + egl-wayland) implement
+    // linux-drm-syncobj-v1 internally inside eglSwapBuffers(). Binding a
+    // second syncobj surface from Qt would raise the surface_exists
+    // protocol error, so the Qt-side path is skipped for those vendors.
+    bool m_checkedEglSyncobjSupport = false;
+    bool m_eglHandlesDrmSyncobj = false;
 };
 
 }
